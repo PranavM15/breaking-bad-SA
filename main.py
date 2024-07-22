@@ -7,9 +7,6 @@ from nltk.stem import WordNetLemmatizer
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import seaborn as sns
-from gensim import corpora
-from gensim.models.ldamodel import LdaModel
-from gensim.models.coherencemodel import CoherenceModel
 from textblob import TextBlob
 from itertools import combinations
 
@@ -20,8 +17,10 @@ nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
+# init lemmatizer and stopwords
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
+
 filler_words = {'um', 'got', 'uh', 'like', "youre", "im", 'you', 'ah', 'er', 'mm', 'oh', 'okay', 
                 'know', 'the', 'that', 'thats', 'there', 'this'}
 
@@ -29,9 +28,10 @@ def preprocess_text(text):
     text = re.sub(r'[^a-zA-Z\s]', '', text)  # remove special chars
     text = text.lower()  # lowercase
     words = word_tokenize(text)  # tokenize
-    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words and word not in filler_words]  # lemmatize
+    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words and filler_words]  # lemmatize
     return words
 
+# apply preprocessing
 df['Cleaned_Transcript'] = df['Transcript'].apply(preprocess_text)
 
 # sentiment polarity
@@ -44,7 +44,7 @@ df['Sentiment'] = df['Cleaned_Transcript'].apply(get_sentiment)
 # plot sentiment distribution
 plt.figure(figsize=(10, 6))
 sns.histplot(df['Sentiment'], bins=20, kde=True)
-plt.title('Sentiment Distribution of Breaking Bad Transcripts')
+plt.title('Sentiment Distribution')
 plt.xlabel('Sentiment Polarity')
 plt.ylabel('Frequency')
 plt.show()
@@ -68,9 +68,9 @@ for character in characters:
 character_sentiments = pd.concat(character_sentiments_list, ignore_index=True)
 
 # plot character sentiment
-plt.figure(figsize=(14, 8))
+plt.figure(figsize=(10, 5))
 sns.boxplot(x='Character', y='Character_Sentiment', data=character_sentiments)
-plt.title('Sentiment Analysis by Character')
+plt.title('Sentiment by Character')
 plt.xlabel('Character')
 plt.ylabel('Sentiment Polarity')
 plt.show()
@@ -79,16 +79,16 @@ plt.show()
 episode_sentiment = df.groupby(['Season', 'Episode'])['Sentiment'].mean().reset_index()
 
 # plot sentiment trend
-plt.figure(figsize=(14, 8))
+plt.figure(figsize=(10, 5))
 sns.lineplot(data=episode_sentiment, x='Episode', y='Sentiment', hue='Season', marker='o')
 plt.title('Sentiment Trend Over Episodes')
 plt.xlabel('Episode')
-plt.ylabel('Average Sentiment Polarity')
+plt.ylabel('Avg Sentiment Polarity')
 plt.legend(title='Season', loc='upper right')
 plt.grid(True)
 plt.show()
 
-# load nrc emotion lexicon
+# load NRC emotion lexicon
 nrc_lexicon_path = 'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt'
 nrc_df = pd.read_csv(nrc_lexicon_path, names=['word', 'emotion', 'association'], sep='\t')
 nrc_df = nrc_df.pivot(index='word', columns='emotion', values='association').reset_index()
@@ -117,17 +117,17 @@ for emotion in emotions:
 seasonal_emotion_intensity = df.groupby('Season')[emotions].mean()
 
 # plot emotion changes
-plt.figure(figsize=(14, 8))
+plt.figure(figsize=(10, 5))
 for emotion in emotions:
     plt.plot(seasonal_emotion_intensity.index, seasonal_emotion_intensity[emotion], label=emotion, marker='o')
 plt.xlabel('Season')
 plt.ylabel('Emotion Intensity')
-plt.title('Emotion Intensity Analysis of Breaking Bad by Season')
+plt.title('Emotion by Season')
 plt.legend()
 plt.grid(True)
 plt.show()
 
-# generate word cloud
+# gen wordcloud
 all_words = [word for tokens in df['Cleaned_Transcript'] for word in tokens if word not in filler_words]
 word_freq = nltk.FreqDist(all_words)
 
@@ -136,7 +136,7 @@ wordcloud = WordCloud(width=800, height=400, background_color='white', max_words
 plt.figure(figsize=(10, 5))
 plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis('off')
-plt.title('Word Cloud of Important Words/Names in Breaking Bad Transcripts')
+plt.title('Word Cloud')
 plt.show()
 
 # identify interactions
@@ -161,13 +161,47 @@ for _, row in df.iterrows():
 
 interaction_sentiments = pd.DataFrame(interaction_sentiments_list)
 
-# avg sentiment for pairs
-average_interaction_sentiments = interaction_sentiments.groupby(['Character1', 'Character2'])['Sentiment'].mean().unstack()
+# classify interactions
+interaction_sentiments['Sentiment_Class'] = interaction_sentiments['Sentiment'].apply(lambda x: 'Positive' if x > 0 else ('Negative' if x < 0 else 'Neutral'))
 
-# plot interaction sentiments
-plt.figure(figsize=(10, 8))
-sns.heatmap(average_interaction_sentiments, annot=True, cmap='coolwarm', cbar=True, linewidths=.5)
-plt.title('Average Sentiment of Character Interactions')
+# positive interactions
+positive_interaction_counts = interaction_sentiments[interaction_sentiments['Sentiment_Class'] == 'Positive'].groupby(['Character1', 'Character2']).size().unstack().fillna(0)
+
+# negative interactions
+negative_interaction_counts = interaction_sentiments[interaction_sentiments['Sentiment_Class'] == 'Negative'].groupby(['Character1', 'Character2']).size().unstack().fillna(0)
+
+# plot positive interactions
+plt.figure(figsize=(10, 5))
+sns.heatmap(positive_interaction_counts, annot=True, cmap='Greens', cbar=True, linewidths=.5)
+plt.title('Positive Interactions')
 plt.xlabel('Character 2')
 plt.ylabel('Character 1')
+plt.show()
+
+# plot negative interactions
+plt.figure(figsize=(10, 5))
+sns.heatmap(negative_interaction_counts, annot=True, cmap='Reds', cbar=True, linewidths=.5)
+plt.title('Negative Interactions')
+plt.xlabel('Character 2')
+plt.ylabel('Character 1')
+plt.show()
+
+# classify sentiments
+df['Sentiment_Class'] = df['Sentiment'].apply(lambda x: 'Positive' if x > 0 else ('Negative' if x < 0 else 'Neutral'))
+
+# check season column
+if 'Season' not in df.columns:
+    raise KeyError("The 'Season' column is not in the DataFrame.")
+
+# sentiment proportions by season
+season_sentiment_counts = df.groupby(['Season', 'Sentiment_Class']).size().unstack().fillna(0)
+season_sentiment_proportions = season_sentiment_counts.div(season_sentiment_counts.sum(axis=1), axis=0)
+
+# plot sentiment proportions
+plt.figure(figsize=(10, 5))
+season_sentiment_proportions[['Positive', 'Negative']].plot(kind='bar', stacked=True, color=['g', 'r'], figsize=(14, 8))
+plt.title('Sentiment Proportions by Season')
+plt.xlabel('Season')
+plt.ylabel('Proportion')
+plt.legend(title='Sentiment')
 plt.show()
