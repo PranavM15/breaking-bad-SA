@@ -13,24 +13,18 @@ from gensim.models.coherencemodel import CoherenceModel
 from textblob import TextBlob
 from itertools import combinations
 
-# load dataset
 file_path = '/Users/pranavm/Desktop/Sentiment Analysis on Breaking Bad Project/breaking_bad.csv'
 df = pd.read_csv(file_path, encoding='ISO-8859-1')
 
-# download nltk data
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# init lemmatizer and stopwords
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
-
-# extra filler words
 filler_words = {'um', 'got', 'uh', 'like', "youre", "im", 'you', 'ah', 'er', 'mm', 'oh', 'okay', 
                 'know', 'the', 'that', 'thats', 'there', 'this'}
 
-# text cleaning
 def preprocess_text(text):
     text = re.sub(r'[^a-zA-Z\s]', '', text)  # remove special chars
     text = text.lower()  # lowercase
@@ -38,7 +32,6 @@ def preprocess_text(text):
     words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words and word not in filler_words]  # lemmatize
     return words
 
-# apply preprocessing
 df['Cleaned_Transcript'] = df['Transcript'].apply(preprocess_text)
 
 # sentiment polarity
@@ -95,7 +88,7 @@ plt.legend(title='Season', loc='upper right')
 plt.grid(True)
 plt.show()
 
-# load NRC emotion lexicon
+# load nrc emotion lexicon
 nrc_lexicon_path = 'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt'
 nrc_df = pd.read_csv(nrc_lexicon_path, names=['word', 'emotion', 'association'], sep='\t')
 nrc_df = nrc_df.pivot(index='word', columns='emotion', values='association').reset_index()
